@@ -58,3 +58,9 @@ pico_sdk_import.cmake.bak
 # OS
 .DS_Store
 Thumbs.db
+
+# Sandbox / experiments
+blink/
+
+# Serial logs
+logs/
