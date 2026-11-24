@@ -48,7 +48,7 @@
             "id": "pico.monitor",
             "label": "$(output) Pico Logs",
             "tooltip": "Read Pico USB serial and save to logs/",
-            "command": "cd \"${workspaceFolder}\" && mkdir -p logs && picocom -q -b 115200 --imap lfcrlf --logfile \"logs/$(date +%F_%H-%M-%S).log\" /dev/ttyACM0",
+            "command": "cd \"${workspaceFolder}\" && mkdir -p logs && picocom -q -b 115200 --imap lfcrlf --logfile \"logs/$(date +%F_%H-%M-%S).log\" /dev/serial/by-id/usb-Raspberry_Pi_Pico*",
             "terminal": {
                 "name": "Pico Logs",
                 "focus": true,
