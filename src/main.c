@@ -11,23 +11,26 @@
 #define LED_DELAY_MS 500
 #endif
 
-#define BUTTON_DELAY_MS 10
-
 #define LED 2
 #define BUTTON 3
 #define	LED_BLINK_PRIORITY		(tskIDLE_PRIORITY + 1)
 #define BUTTON_READ_PRIORITY    (tskIDLE_PRIORITY + 2)
 
-volatile int counter = 0;
+int counter = 0;
 
-volatile unsigned long lastDebounceTime = 0;
-unsigned long debounceDelay = 50000;
 int buttonState = 1;
+
+TaskHandle_t xButtonHandle = NULL;
 
 void gpio_callback(uint gpio, uint32_t events) {
     (void)events;
     if (gpio == BUTTON) {
-        lastDebounceTime = time_us_32();
+        BaseType_t xHigherPriorityTaskWoken;
+        xHigherPriorityTaskWoken = pdFALSE;
+
+        vTaskNotifyGiveFromISR(xButtonHandle, &xHigherPriorityTaskWoken);
+
+        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
     }
 }
 
@@ -49,16 +52,20 @@ static void LED_Task(void *pvParameters) {
 
 static void BUTTON_READ_TASK(void *pvParameters) {
     (void)pvParameters;
+    
+    const TickType_t xDebounceWindow = pdMS_TO_TICKS(50);
+
     for (;;) {
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+
+        while (ulTaskNotifyTake(pdTRUE, xDebounceWindow) != 0);
+
         int reading = gpio_get(BUTTON);
-        if ((time_us_32() - lastDebounceTime) > debounceDelay) {
-            if (reading != buttonState) {
-                buttonState = reading;
-                counter++;
-                printf("STATE: %d, COUNTER: %d\n", buttonState, counter);
-            }
+        if (reading != buttonState) {
+            buttonState = reading;
+            counter++;
+            printf("STATE: %d, COUNTER: %d\n", buttonState, counter);
         }
-        vTaskDelay(pdMS_TO_TICKS(BUTTON_DELAY_MS));
     }
 }
 
@@ -81,11 +88,11 @@ int main(void) {
     gpio_set_dir(BUTTON, GPIO_IN);
     gpio_pull_up(BUTTON);
 
+    xTaskCreate(LED_Task, "LED", configMINIMAL_STACK_SIZE, NULL, LED_BLINK_PRIORITY, NULL);
+    xTaskCreate(BUTTON_READ_TASK, "BUTTON", configMINIMAL_STACK_SIZE, NULL, BUTTON_READ_PRIORITY, &xButtonHandle);
+
     gpio_set_irq_enabled_with_callback(BUTTON, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true, &gpio_callback);
 
-    xTaskCreate(LED_Task, "LED", configMINIMAL_STACK_SIZE, NULL, LED_BLINK_PRIORITY, NULL);
-    xTaskCreate(BUTTON_READ_TASK, "BUTTON", configMINIMAL_STACK_SIZE, NULL, BUTTON_READ_PRIORITY, NULL);
 	vTaskStartScheduler();
-
 	for (;;);
 }
